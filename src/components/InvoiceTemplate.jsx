@@ -233,6 +233,9 @@ export default function InvoiceTemplate({
   };
 
   const [bank, setBank] = useState(null);
+  const [availableBanks, setAvailableBanks] = useState([]);
+  const [selectedBankId, setSelectedBankId] = useState(invoice.bank_id ? String(invoice.bank_id) : "");
+  const [bankLoading, setBankLoading] = useState(false);
 
   const [viewMode, setViewMode] = useState("full");
   const [selectedItemIdx, setSelectedItemIdx] = useState(0);
@@ -275,21 +278,47 @@ export default function InvoiceTemplate({
 
   // Fetch bank details if bank_id exists
   useEffect(() => {
-    if (invoice.bank_id) {
-      fetch(`/api/bank?bank_id=${invoice.bank_id}`, { method: "GET" })
+    if (selectedBankId && selectedBankId !== "") {
+      setBankLoading(true);
+      fetch(`/api/bank?bank_id=${selectedBankId}`, { method: "GET" })
         .then((res) => {
           if (!res.ok) throw new Error("Failed to fetch bank");
           return res.json();
         })
         .then((data) => {
+          console.log("Bank details fetched:", data);
           setBank(data);
+          setBankLoading(false);
         })
         .catch((error) => {
           console.error("Error fetching bank:", error);
           setBank(null);
+          setBankLoading(false);
+        });
+    } else {
+      setBank(null);
+      setBankLoading(false);
+    }
+  }, [selectedBankId]);
+
+  // Fetch available banks when in edit mode
+  useEffect(() => {
+    if (isEditing) {
+      fetch('/api/banks', { method: 'GET' })
+        .then((res) => {
+          if (!res.ok) throw new Error('Failed to fetch banks');
+          return res.json();
+        })
+        .then((data) => {
+          console.log("Available banks fetched:", data);
+          setAvailableBanks(data);
+        })
+        .catch((error) => {
+          console.error('Error fetching banks:', error);
+          setAvailableBanks([]);
         });
     }
-  }, []);
+  }, [isEditing]);
 
   // --- HTML2CANVAS EXPORT LOGIC ---
   const handleExport = async (mode = "print") => {
@@ -378,6 +407,20 @@ export default function InvoiceTemplate({
     selectedItemIdx,
   ]);
 
+  const handleSaveChanges = () => {
+    // Empty function for now - backend calls will be added later
+    const changes = {
+      invoiceDate: localInvoiceDate,
+      dueDate: localDueDate,
+      invoiceItems: localInvoiceItems,
+      savedExpenses: savedExpenses,
+      taxPercent: taxPercent,
+      bank_id: selectedBankId || null,
+      bank: bank,
+    };
+    console.log("Saving changes:", changes);
+  };
+
   const handleEditToggle = () => {
     if (!isEditing) {
       setEditInvoiceDate(formatDateToISO(localInvoiceDate));
@@ -385,6 +428,7 @@ export default function InvoiceTemplate({
     } else {
       setLocalInvoiceDate(formatISOToDisplay(editInvoiceDate));
       setLocalDueDate(formatISOToDisplay(editDueDate));
+      handleSaveChanges();
     }
     setIsEditing(!isEditing);
   };
@@ -1194,14 +1238,52 @@ const renderExpenseRows = (mainIdx) => {
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
             <AccountBalanceIcon fontSize="small" sx={{ color: theme.accent }} />
-          {bank ? (
+          {isEditing ? (
+            <FormControl size="small" sx={{ minWidth: 300 }}>
+              <InputLabel sx={{ fontSize: 13 }} id="bank-select-label">Select Bank</InputLabel>
+              <Select
+                labelId="bank-select-label"
+                id="bank-select"
+                label="Select Bank"
+                value={selectedBankId || ""}
+                onChange={(e) => {
+                  const value = String(e.target.value);
+                  console.log("Bank selected:", value);
+                  setSelectedBankId(value);
+                }}
+                sx={{
+                  height: 32,
+                  fontSize: 13,
+                  ".MuiSelect-select": { pl: "5px" },
+                }}
+              >
+                <MenuItem value="" sx={{ fontSize: 13 }}>
+                  <em>None</em>
+                </MenuItem>
+                {availableBanks && availableBanks.length > 0 ? (
+                  availableBanks.map((b) => {
+                    const bankId = String(b.id || b.bank_id || b._id);
+                    return (
+                      <MenuItem key={bankId} value={bankId} sx={{ fontSize: 13 }}>
+                        {b.name} - {b.country}
+                      </MenuItem>
+                    );
+                  })
+                ) : (
+                  <MenuItem disabled sx={{ fontSize: 13 }}>
+                    No banks available
+                  </MenuItem>
+                )}
+              </Select>
+            </FormControl>
+          ) : bank ? (
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
               <Typography variant="body2" color="text.secondary">
                {bank.name} ,{bank.country}
               </Typography>
             </Box>
           ) : (
-            <Typography variant="body2" color="text.secondary">-</Typography>
+            <Typography variant="body2" color="text.secondary">No Bank Selected</Typography>
           )}
           </Box>
         </Box>
