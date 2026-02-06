@@ -1,0 +1,23 @@
+.expense-row:hover .row-action-icon {
+  opacity: 1 !important;
+}
+.row-action-icon {
+  opacity: 0;
+  pointer-events: auto;
+}
+
+#invoicetable {
+  td,
+  input {
+    text-align: center !important;
+  }
+}
+
+.datePickr {
+  span {
+    font-size: small !important;
+  }
+  .MuiPickersInputBase-root {
+    padding-left: 5px !important;
+  }
+}
